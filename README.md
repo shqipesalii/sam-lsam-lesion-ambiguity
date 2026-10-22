@@ -2,7 +2,7 @@
 
 Code accompanying the manuscript submitted to the *IEEE Open Journal of Engineering in Medicine and Biology* (OJEMB-00183-2026).
 
-Trained weights and all generated datasets are archived on Zenodo: **DOI: [DOI]**.
+Trained weights and all generated datasets are archived on Zenodo: **[10.5281/zenodo.23570163](https://doi.org/10.5281/zenodo.23570163)**.
 
 ## Contents
 
