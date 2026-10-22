@@ -1,0 +1,9 @@
+*.pth
+*.nii.gz
+*.png
+*.csv
+*.log
+__pycache__/
+results*/
+*_datasets/
+.DS_Store
