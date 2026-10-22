@@ -14,6 +14,21 @@ Trained weights and all generated datasets are archived on Zenodo: **DOI: [DOI]*
 | `nnunet/` | nnU-Net 2D dataset setup and prediction (nnU-Net 3D: standard `nnUNetv2_train <ID> 3d_fullres 0`) |
 | `figures/` | Scripts for the figures in the paper |
 
+## Seeds
+
+| Data | Script | Seed(s) |
+|---|---|---|
+| Ten V2 test realizations (run 1–10) | `generators/generate_v2.py` | 42, 123, 2024, 2025, 7, 77, 99, 1001, 1337, 9999 |
+| Training set for decoder-only, LSAM and nnU-Net 2D | `generators/generate_v2.py` | 55555 |
+| Fixed artifact set (earlier V2 generator) | `generators/generate_phantom_shapes_v2.py` | 42 |
+| OOD sets (shape, appearance, combined) | `lsam/ood_generate.py` | set in the script (9000 + j, run offsets) |
+| Factorial cells A–C | `lsam/r27_factorial.py` | set in the script (run offsets) |
+| Box perturbations | `lsam/box_jitter.py` | fixed per slice (`seed_of`) |
+
+LSAM and decoder-only training did not fix a training seed (see the paper). `generators/run_10_sam_experiments.sh` documents the test seeds and the original zero-shot SAM pipeline; its evaluation step (`evaluate_sam_full_metrics.py`) is superseded. All reported metrics are computed with `lsam/revision_eval.py`.
+
+To regenerate the training set: `python generators/generate_v2.py --seed 55555 --out_dir LSAM_train_PhantomShapes_V2`
+
 ## Setup
 
 ```bash
