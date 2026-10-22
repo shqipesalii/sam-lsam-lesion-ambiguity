@@ -1,0 +1,13 @@
+torch==2.12.0
+numpy==2.4.4
+scipy==1.17.1
+pandas==3.0.3
+statsmodels==0.14.6
+MedPy==0.5.2
+nibabel==5.4.2
+SimpleITK==2.5.4
+opencv-python==4.13.0.92
+scikit-image==0.26.0
+matplotlib==3.10.9
+nnunetv2==2.7.0
+segment-anything @ git+https://github.com/facebookresearch/segment-anything.git
