@@ -8,10 +8,6 @@ for i in {1..10}
 do
     SEED=${SEEDS[$i-1]}
 
-    echo "======================================"
-    echo "Running SAM experiment $i with seed $SEED"
-    echo "======================================"
-
     DATASET_DIR="PhantomShapes_V2_run${i}"
     SAM_DIR="SAM_dataset_run${i}"
     PRED_DIR="SAM_predictions_run${i}"
