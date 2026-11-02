@@ -12,7 +12,8 @@ Trained weights and all generated datasets are archived on Zenodo: **[10.5281/ze
 | `sam_baseline/` | Slice conversion, zero-shot SAM inference, artifact evaluation, BUSI subset preparation |
 | `lsam/` | Decoder-only fine-tuning and LSAM training, all revision evaluations (per-lesion boxes, box perturbation, OOD, BUSI with MedSAM and SAM 2.1, factorial design), statistics (Wilcoxon/Holm, bootstrap CIs, mixed-effects models) |
 | `nnunet/` | nnU-Net 2D dataset setup and prediction (nnU-Net 3D: standard `nnUNetv2_train <ID> 3d_fullres 0`) |
-| `figures/` | Scripts for the figures in the paper |
+| `figures/` | Scripts for the figures in the paper (`plot_variation_hd95.py`: HD95 by active variation; `plot_factors.py`: adjusted factor effects; `make_ablation_qualitative_figure.py`: ablation examples) |
+| `docs/` | `ood_generation.md`: full description of the out-of-distribution test-set generator (shape model, texture, bias field, noise, parameter ranges, order of operations, seeds) |
 
 ## Seeds
 
@@ -21,8 +22,8 @@ Trained weights and all generated datasets are archived on Zenodo: **[10.5281/ze
 | Ten V2 test realizations (run 1–10) | `generators/generate_v2.py` | 42, 123, 2024, 2025, 7, 77, 99, 1001, 1337, 9999 |
 | Training set for decoder-only, LSAM and nnU-Net 2D | `generators/generate_v2.py` | 55555 |
 | Fixed artifact set (earlier V2 generator) | `generators/generate_phantom_shapes_v2.py` | 42 |
-| OOD sets (shape, appearance, combined) | `lsam/ood_generate.py` | set in the script (9000 + j, run offsets) |
-| Factorial cells A–C | `lsam/r27_factorial.py` | set in the script (run offsets) |
+| OOD sets (shape, appearance, combined) | `lsam/ood_generate.py` | 8100 + r, 8200 + r, 8300 + r (r = 1–10); example figure 9000 + j |
+| Factorial cells A–C | `lsam/r27_factorial.py` | set in the script (run offsets; `--design revised` reruns B and C with the same offsets, cell A is unchanged) |
 | Box perturbations | `lsam/box_jitter.py` | fixed per slice (`seed_of`) |
 
 LSAM and decoder-only training did not fix a training seed (see the paper). `generators/run_10_sam_experiments.sh` documents the test seeds and the original zero-shot SAM pipeline; its evaluation step (`evaluate_sam_full_metrics.py`) is superseded. All reported metrics are computed with `lsam/revision_eval.py`.
@@ -47,10 +48,10 @@ grep -rl "/home/shqipe/Desktop" . | xargs sed -i "s#/home/shqipe/Desktop#$HOME/y
 ## Reproducing the paper
 
 1. **Data.** Either download the generated datasets from Zenodo or regenerate them:
-   `python generators/generate_v2.py --seed <seed>` for each V2 realization (seeds in `run_10_sam_experiments.sh`), `python lsam/ood_generate.py` for the three OOD sets (seeds 9000+), `python lsam/r27_factorial.py` for the structure–appearance factorial cells.
+   `python generators/generate_v2.py --seed <seed>` for each V2 realization (seeds in `run_10_sam_experiments.sh`), `python lsam/ood_generate.py` for the three OOD sets (seeds 8100+r, 8200+r, 8300+r; full description in `docs/ood_generation.md`), `python lsam/r27_factorial.py` for the structure–appearance factorial cells (default `--design revised`: the structure switch covers lesion geometry — irregular boundaries, multiplicity, peripheral displacement — and the appearance switch covers low contrast, noise, blur and intensity scaling; only cells B and C are regenerated, which `lsam/r27_check_design.py` verifies on CPU; `--design original` reproduces the first-revision cells).
 2. **Training.** `python lsam/train_sam_decoder_finetune.py`, `python lsam/train_lsam_full.py`, `python lsam/train_lsam_ablation.py` (20 epochs, AdamW, lr 1e-5, weight decay 1e-4, λ = 0.3; no fixed training seed, see the paper). nnU-Net: `nnunet/setup_nnunet2d_dataset.sh`, then 100 epochs (`nnUNetTrainer_100epochs`), fold 0, final checkpoint.
 3. **Evaluation.** `lsam/revision_eval.py` (all models on V2, tight boxes), `per_lesion_boxes.py`, `box_jitter.py`, `box_jitter_ablation.py`, `ood_eval.py`, `ood_eval_nnunet.py`, `busi_eval.py`, `busi_medsam.py`, `busi_sam2.py`, `nnunet2d_medpy.py`, `nnunet3d_recheck.py`; artifacts: `sam_baseline/artifact_case_level.py`.
-4. **Statistics.** `lsam_comparison.py`, `analyze_per_lesion.py`, `analyze_jitter.py`, `analyze_jitter_ablation.py`, `analyze_ablation.py`, `factor_mixed_model.py`, `cnr_analysis.py`, `r27_analysis.py`, `ood_analysis.py`, `busi_analysis.py`, `sam_baseline/artifact_case_level_stats.py`.
+4. **Statistics.** `lsam_comparison.py`, `analyze_per_lesion.py`, `analyze_jitter.py`, `analyze_jitter_ablation.py`, `analyze_ablation.py`, `factor_mixed_model.py`, `cnr_analysis.py`, `r27_analysis.py` (`--design revised` or `original`; uses statsmodels), `ood_analysis.py`, `busi_analysis.py`, `sam_baseline/artifact_case_level_stats.py`.
 
 All metrics use MedPy (`dc`, `hd`, `hd95`, `assd`); empty predictions are scored as DSC = 0 and distance = image diagonal.
 

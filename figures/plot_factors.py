@@ -11,10 +11,10 @@ df = pd.read_csv(src, index_col=0)
 
 rows = [  # (label, term, group)
     ("Multiple lesions", "multiple", "Ambiguity factors"),
-    ("Partial-edge visibility", "partial_edge", "Ambiguity factors"),
+    ("Peripheral displacement", "partial_edge", "Ambiguity factors"),
     ("Irregular boundaries", "irregular", "Ambiguity factors"),
     ("Low contrast", "low_contrast", "Ambiguity factors"),
-    ("Multiple × partial edge", "multiple:partial_edge", "Interactions"),
+    ("Multiple × peripheral displ.", "multiple:partial_edge", "Interactions"),
     ("Multiple × low contrast", "multiple:low_contrast", "Interactions"),
     ("Multiple × irregular", "multiple:irregular", "Interactions"),
     ("Blur σ (per unit)", "blur", "Nuisance parameters"),

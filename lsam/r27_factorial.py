@@ -55,7 +55,16 @@ def appearance(mode):
         return 10, 0.5, float(np.random.uniform(0.9, 1.1))
     return int(np.random.choice([8, 12, 18, 25, 35])), float(np.random.choice([0.3, 0.5, 0.8, 1.1])), float(np.random.uniform(0.85, 1.15))
 
-def generate_case(base, empty, structure, app):
+_AUX = np.random.RandomState(0)
+
+def generate_case(base, empty, structure, app, design="revised", aux=None):
+    """design="original": the structure switch toggles all four lesion-level factors (incl. low contrast).
+    design="revised": structure toggles lesion geometry only (irregular, multiple, peripheral displacement);
+    low contrast belongs to the appearance switch, together with noise, blur and intensity scaling.
+    The global random stream is consumed exactly as in the original design, so cell A is generated
+    identically and revised B/C keep the original masks, classes and nuisance parameters; when the contrast
+    flag changes, the lesion intensity is redrawn from the auxiliary generator `aux`."""
+    aux = _AUX if aux is None else aux
     img_vol = np.zeros((IMG_DIM, IMG_DIM, N_SLICES), np.float32); lbl_vol = np.zeros_like(img_vol, dtype=np.uint8)
     if empty:
         for z in range(N_SLICES):
@@ -63,8 +72,13 @@ def generate_case(base, empty, structure, app):
         return img_vol, lbl_vol, dict(cls="empty", variations="empty", noise=0, blur=0, scale=1.0)
     cls = np.random.choice(["circle", "square", "triangle"])
     irr, mult, low, edge = (np.random.rand() < 0.65, np.random.rand() < 0.35, np.random.rand() < 0.45, np.random.rand() < 0.35)
+    low_original = low and structure            # contrast flag under the original switch definition
     if not structure:
-        irr = mult = low = edge = False
+        irr = mult = edge = False
+    if design == "original":
+        low = low_original
+    elif app != "v2":
+        low = False
     noise, blur, scale = appearance(app)
     var = [n for n, f in (("irregular", irr), ("multiple_lesions", mult), ("low_contrast", low), ("partial_edge", edge)) if f]
     final = np.zeros((IMG_DIM, IMG_DIM), np.uint8)
@@ -73,7 +87,9 @@ def generate_case(base, empty, structure, app):
         if irr: m = make_irregular(m)
         if edge: m = move_to_edge(m)
         final = np.maximum(final, m)
-    inten = np.random.randint(80, 250) if low else np.random.randint(350, 600)
+    inten = np.random.randint(80, 250) if low_original else np.random.randint(350, 600)   # original draw
+    if low != low_original:
+        inten = aux.randint(80, 250) if low else aux.randint(350, 600)
     for z in range(N_SLICES):
         sm = final.copy()
         if z in (0, N_SLICES - 1) and np.random.rand() < 0.5:
@@ -89,7 +105,14 @@ def orient(a):
     return np.flipud(np.rot90(a, k=1))
 
 def main():
-    ap = argparse.ArgumentParser(); ap.add_argument("--test", action="store_true"); a = ap.parse_args()
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--test", action="store_true")
+    ap.add_argument("--design", choices=["revised", "original"], default="revised",
+                    help="revised: low contrast in the appearance switch (cells B and C change, A and D do not)")
+    ap.add_argument("--cells", default=None, help="comma-separated subset of A,B,C (default: B,C revised; A,B,C original)")
+    a = ap.parse_args()
+    cell_list = (a.cells or ("B,C" if a.design == "revised" else "A,B,C")).split(",")
+    tag = "r27" if a.design == "original" else "r27_revised"
     import torch
     from segment_anything import sam_model_registry, SamPredictor
     from revision_eval import compute_metrics, SAM_CHECKPOINT, DEVICE
@@ -99,7 +122,11 @@ def main():
         m, s, _ = pred.predict(box=box, multimask_output=True); return m[int(np.argmax(s))].astype(np.uint8)
     def tbox(m):
         ys, xs = np.where(m > 0); return np.array([xs.min(), ys.min(), xs.max(), ys.max()], np.float32)
-    cells = {"A": (False, "v1", 7000), "B": (True, "v1", 7100), "C": (False, "v2", 7200)}
+    # same seed offsets as the original design: realizations stay independent across cells, and each revised
+    # B/C realization is paired with its original counterpart (identical masks and nuisance parameters; only
+    # lesion contrast differs), which also gives a paired estimate of the low-contrast effect
+    cells = {k: v for k, v in {"A": (False, "v1", 7000), "B": (True, "v1", 7100), "C": (False, "v2", 7200)}.items()
+             if k in cell_list}
     nrun, nvol = (1, 40) if a.test else (10, 150)
     base = create_base_phantom()
     rows = []
@@ -107,8 +134,9 @@ def main():
     for cell, (structure, app, s0) in cells.items():
         for r in range(1, nrun + 1):
             np.random.seed(s0 + r)
+            aux = np.random.RandomState(100000 + s0 + r)
             for i in range(1, nvol + 1):
-                img, lbl, meta = generate_case(base, i <= 30, structure, app)
+                img, lbl, meta = generate_case(base, i <= 30, structure, app, a.design, aux)
                 if i <= 30:
                     continue
                 for z in range(N_SLICES):
@@ -123,10 +151,10 @@ def main():
                         per = merged if n <= 1 else np.max([best(tbox((lab == k).astype(np.uint8))) for k in range(1, n + 1)], axis=0)
                     for prompt, p in (("merged", merged), ("per_lesion", per)):
                         d, h, h95, s, e = compute_metrics(p, gt)
-                        rows.append(dict(cell=cell, structure=int(structure), appearance=app, run=f"{cell}{r}",
+                        rows.append(dict(cell=cell, design=a.design, structure=int(structure), appearance=app, run=f"{cell}{r}",
                                          case_id=f"Case{i:03d}", slice=z, prompt=prompt, n_components=n,
                                          DSC=d, HD=h, HD95=h95, ASD=s, empty_pred=e, **meta))
-            pd.DataFrame(rows).to_csv(f"{OUT}/r27_per_slice{'_test' if a.test else ''}.csv", index=False)
+            pd.DataFrame(rows).to_csv(f"{OUT}/{tag}_per_slice{'_test' if a.test else ''}.csv", index=False)
             print(f"cell {cell} run {r} done", flush=True)
     df = pd.DataFrame(rows)
     print(df[df.prompt == "merged"].groupby(["cell", "run"])[["DSC", "HD95"]].mean().groupby("cell").mean().round(4))

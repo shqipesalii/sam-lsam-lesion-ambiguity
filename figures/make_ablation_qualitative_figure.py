@@ -41,7 +41,7 @@ VARIANT_LABELS = [
 GT_COLOR = "#F0E442"
 PRED_COLOR = "#009E73"
 
-ROW_LABELS = {"case_multi_lesion": "Partial\nEdge", "case_partial_edge": "Multiple\nLesions"}
+ROW_LABELS = {"case_multi_lesion": "Peripheral\nDisplacement", "case_partial_edge": "Multiple\nLesions"}
 
 
 from scipy.ndimage import binary_closing, label
